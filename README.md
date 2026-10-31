@@ -24,3 +24,59 @@ Python 3.8+ is recommended. Create a virtual environment and install the require
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install numpy matplotlib scikit-learn pytest
+```
+
+---
+
+## 🧪 Running and Adding Tests
+
+### How to Run the Tests
+
+The project includes an automated test suite powered by `pytest` to verify mathematical accuracy, distance matrix symmetry, probability normalizations, and numerical stability.
+
+To run all available tests with detailed output, run:
+
+```bash
+pytest test_tsne.py -v
+```
+
+To run a specific test by name:
+
+```bash
+pytest test_tsne.py -k "<test_name>" -v
+```
+
+Example:
+
+```bash
+pytest test_tsne.py -k "test_joint_probabilities_properties" -v
+```
+
+---
+
+### How to Add a New Test
+
+To add custom test cases:
+
+1. Open `test_tsne.py` (or create any file matching the pattern `test_*.py`).
+2. Define a function prefixed with `test_` so `pytest` automatically detects it.
+3. Import the target function from `tsne_exact.py` and write your validation checks using standard `assert` statements or `numpy.testing`.
+
+**Example:**
+
+```python
+def test_custom_data_run():
+    """Verify that t-SNE handles a custom input shape without non-finite values."""
+    X_custom = np.random.randn(30, 8)
+    Y = tsne(X_custom, no_dims=2, perplexity=5.0, max_iter=100)
+
+    # Validate output dimensions and finite values
+    assert Y.shape == (30, 2)
+    assert np.isfinite(Y).all()
+```
+
+Run your new test individually using:
+
+```bash
+pytest test_tsne.py -k "test_custom_data_run" -v
+```
