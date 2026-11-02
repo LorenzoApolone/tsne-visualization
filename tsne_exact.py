@@ -108,7 +108,7 @@ def compute_joint_probabilities(X: np.ndarray, perplexity: float = 30.0, tol: fl
 
 
 def tsne(X: np.ndarray, no_dims: int = 2, perplexity: float = 30.0,
-         max_iter: int = 500, eta: float = 200.0,
+         max_iter: int = 500, eta: float = 100.0,
          initial_momentum: float = 0.5, final_momentum: float = 0.8) -> np.ndarray:
     """
     Executes the exact t-SNE algorithm to map high-dimensional data X to low-dimensional embedding Y.
@@ -126,55 +126,55 @@ def tsne(X: np.ndarray, no_dims: int = 2, perplexity: float = 30.0,
         np.ndarray: Low-dimensional coordinates Y of shape (n_samples, no_dims).
     """
     n, _ = X.shape
-
-    # 1. Compute high-dimensional joint probabilities P
     P = compute_joint_probabilities(X, perplexity=perplexity)
-
-    # Apply early exaggeration to force distinct clusters to form tight groups
+    
+    # force clusters to tighten early on
     early_exaggeration_factor = 4.0
     P = P * early_exaggeration_factor
-
-    # 2. Initialize low-dimensional coordinates Y with small Gaussian noise
+    
     Y = np.random.randn(n, no_dims) * 1e-4
     dY = np.zeros((n, no_dims), dtype=np.float64)
     iY = np.zeros((n, no_dims), dtype=np.float64)
-
+    gains = np.ones((n, no_dims), dtype=np.float64)
+    
     for iter_idx in range(max_iter):
-        # Compute low-dimensional squared Euclidean distances
+        # pairwise affinities in low-dim space (Student-t)
         sum_Y = np.sum(np.square(Y), axis=1)
         num = -2.0 * np.dot(Y, Y.T)
-        # Compute Student-t kernel: q_ij ~ (1 + ||y_i - y_j||^2)^(-1)
         num = 1.0 / (1.0 + np.add(np.add(num, sum_Y).T, sum_Y))
         np.fill_diagonal(num, 0.0)
-
-        # Normalize to obtain joint distribution Q
-        sum_num = np.sum(num)
-        Q = num / sum_num
+        
+        Q = num / np.sum(num)
         Q = np.maximum(Q, 1e-12)
-
-        # 3. Compute analytical gradient dC/dY_i
-        # PQ = (p_ij - q_ij) * (1 + ||y_i - y_j||^2)^(-1)
+        
+        # gradient dC/dY
         PQ = (P - Q) * num
         for i in range(n):
             dY[i, :] = 4.0 * np.sum((Y[i, :] - Y) * PQ[i, :, np.newaxis], axis=0)
-
-        # 4. Perform gradient descent update with momentum
+        
         momentum = initial_momentum if iter_idx < 250 else final_momentum
-        iY = momentum * iY - eta * dY
+        
+        # adaptive learning rate (Jacobs, 1988)
+        # boost gain if gradient and momentum have same sign, dampen otherwise
+        gains = (gains + 0.2) * ((np.sign(dY) != np.sign(iY)) * 1.0) + \
+                (gains * 0.8) * ((np.sign(dY) == np.sign(iY)) * 1.0)
+        gains[gains < 0.01] = 0.01
+        
+        # apply update
+        iY = momentum * iY - eta * (gains * dY)
         Y = Y + iY
-
-        # Zero-center embedding to prevent drifting
+        
+        # zero-center to prevent drift
         Y = Y - np.mean(Y, axis=0)
-
-        # Disable early exaggeration after iteration 100
-        if iter_idx == 100:
+        
+        # stop early exaggeration
+        if iter_idx == 50:
             P = P / early_exaggeration_factor
-
-        # Log Kullback-Leibler divergence periodically
+            
         if (iter_idx + 1) % 100 == 0:
             cost = np.sum(P * np.log(P / Q))
             print(f"Iteration {iter_idx + 1:4d} | KL Divergence: {cost:.4f}")
-
+            
     return Y
 
 
