@@ -8,7 +8,8 @@ based on the original paper:
 
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.datasets import make_blobs
+from sklearn.decomposition import PCA
+from sklearn.datasets import load_digits, load_iris
 
 
 def compute_squared_pairwise_distances(X: np.ndarray) -> np.ndarray:
@@ -181,23 +182,64 @@ def tsne(X: np.ndarray, no_dims: int = 2, perplexity: float = 30.0,
 if __name__ == "__main__":
     np.random.seed(42)
 
-    # Generate synthetic 50-dimensional dataset with 3 clusters
-    n_samples = 300
-    n_features = 50
-    centers = 3
-    X, labels = make_blobs(n_samples=n_samples, n_features=n_features, centers=centers, random_state=42)
+    # Use a reproducible subset of the real handwritten-digits dataset.
+    X, labels = load_digits(return_X_y=True)
+    sample_indices = np.random.choice(X.shape[0], size=500, replace=False)
+    X = X[sample_indices]
+    labels = labels[sample_indices]
 
-    print(f"Running t-SNE on {n_samples} samples with {n_features} features...")
-    Y = tsne(X, no_dims=2, perplexity=30.0, max_iter=500)
+    # Reduce the 64 pixel features to 30 before running exact t-SNE.
+    X_pca = PCA(n_components=30, random_state=42).fit_transform(X)
+    print(f"Running t-SNE on {len(X)} Digits samples after PCA ({X.shape[1]} -> {X_pca.shape[1]} features)...")
+    Y = tsne(X_pca, no_dims=2, perplexity=30.0, max_iter=500)
 
     # Plot the 2D projected embedding
     plt.figure(figsize=(8, 6))
     scatter = plt.scatter(Y[:, 0], Y[:, 1], c=labels, cmap="viridis", s=40, edgecolors="k", alpha=0.85)
-    plt.title("2D Projection via Exact t-SNE (van der Maaten & Hinton, 2008)")
+    plt.title("Digits dataset: 2D projection via exact t-SNE")
     plt.xlabel("Dimension 1")
     plt.ylabel("Dimension 2")
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.colorbar(scatter, label="Ground Truth Cluster")
     plt.tight_layout()
     plt.savefig("tsne_projection_demo.png", dpi=150)
-    print("Execution complete. Projection figure saved as 'tsne_projection_demo.png'.")
+    print("Execution complete. Projection saved as 'tsne_projection_demo.png'.")
+
+    # Compare t-SNE with the known species labels in the Iris dataset.
+    iris = load_iris()
+    iris_reference = PCA(n_components=2, random_state=42).fit_transform(iris.data)
+    print(f"Running t-SNE on {len(iris.data)} Iris samples ({iris.data.shape[1]} features)...")
+    iris_embedding = tsne(iris.data, no_dims=2, perplexity=30.0, max_iter=500)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
+    for ax, coordinates, title in zip(
+        axes,
+        (iris_reference, iris_embedding),
+        ("PCA reference (known species)", "Exact t-SNE embedding"),
+    ):
+        scatter = ax.scatter(
+            coordinates[:, 0],
+            coordinates[:, 1],
+            c=iris.target,
+            cmap="viridis",
+            vmin=0,
+            vmax=2,
+            s=40,
+            edgecolors="k",
+            alpha=0.85,
+        )
+        ax.set_title(title)
+        ax.set_xlabel("Dimension 1")
+        ax.set_ylabel("Dimension 2")
+        ax.grid(True, linestyle="--", alpha=0.5)
+
+    colorbar = fig.colorbar(
+        scatter,
+        ax=axes,
+        ticks=np.arange(len(iris.target_names)),
+        label="Known Iris species",
+    )
+    colorbar.ax.set_yticklabels(iris.target_names)
+    fig.suptitle("Iris: known labels compared with t-SNE")
+    fig.savefig("iris_tsne_comparison.png", dpi=150)
+    print("Iris comparison saved as 'iris_tsne_comparison.png'.")

@@ -30,6 +30,24 @@ pip install numpy matplotlib scikit-learn pytest
 
 ## 🧪 Running and Adding Tests
 
+### Run the Digits Dataset Demo
+
+The `tsne` function operates on the input features it receives; PCA is not part
+of the t-SNE implementation itself. To demonstrate a common pre-processing
+pipeline, running the script loads 500 handwritten digits from scikit-learn's
+Digits dataset, reduces the 64 pixel features to 30 with PCA, then runs exact
+t-SNE and saves a labeled scatter plot as `tsne_projection_demo.png`:
+
+```bash
+python tsne_exact.py
+```
+
+The same run also uses the Iris dataset, which has known species labels. Its
+comparison plot shows a 2D PCA reference and the t-SNE embedding, both colored
+by the known species, in `iris_tsne_comparison.png`. Since t-SNE is an
+embedding algorithm rather than a classifier, compare the class separation
+visually rather than treating its coordinates as predicted labels.
+
 ### How to Run the Tests
 
 The project includes an automated test suite powered by `pytest` to verify mathematical accuracy, distance matrix symmetry, probability normalizations, and numerical stability.
